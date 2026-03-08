@@ -7,11 +7,17 @@ export class AppController {
 
   @Get('F')
   async getscheduleF(){
-    return this.appService.getscheduleF();
+    return{
+      Bloque: "F",
+      schudule: await this.appService.getscheduleF()
+    } 
   }
   @Get('G')
-  getscheduleG() {
-    return this.appService.getscheduleG();
+  async getscheduleG() {
+    return {
+      Bloque: "G",
+      schudule: await this.appService.getscheduleG()
+    }
   }
 
 }
