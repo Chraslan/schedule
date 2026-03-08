@@ -1,0 +1,35 @@
+﻿services:
+  - type: web
+    name: schedule-api
+    runtime: node
+    repo: https://github.com/Chraslan/schedule
+    branch: main
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: node dist/main
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: REDIS_HOST
+        fromService:
+          name: schedule-redis
+          type: redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          name: schedule-redis
+          type: redis
+          property: port
+      - key: CACHE_TTL
+        value: 60000
+      - key: UPDATE_INTERVAL
+        value: 60000
+      - key: API_BASE_URL
+        value: https://cloud.urbe.edu/web/v1/core/labComp/rotafolio
+
+  - type: redis
+    name: schedule-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
