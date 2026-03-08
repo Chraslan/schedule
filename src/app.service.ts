@@ -19,7 +19,7 @@ export class AppService implements OnModuleInit {
     try {
       // Usar variables de entorno para las URLs
       const baseUrl = process.env.API_BASE_URL || 'https://cloud.urbe.edu/web/v1/core/labComp/rotafolio';
-      
+      console.log( process.env.API_BASE_URL);
       const [f, g] = await Promise.all([
         fetch(`${baseUrl}?idBloque=6`).then(r => r.ok && r.json()),
         fetch(`${baseUrl}?idBloque=7`).then(r => r.ok && r.json())
