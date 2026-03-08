@@ -1,93 +1,103 @@
 import { Injectable, Inject, OnModuleInit } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager'; 
+import axios from 'axios';
 
 @Injectable()
 export class AppService implements OnModuleInit {
   private fallback = new Map<string, any[]>();
+  private readonly API_TIMEOUT = 30000; // 30 segundos
 
   constructor(@Inject(CACHE_MANAGER) private redis: Cache) {}
 
   async onModuleInit() {
-    console.log('🚀 AppService iniciando...');
-    console.log('📋 Variables de entorno:');
-    console.log(`   - API_BASE_URL: ${process.env.API_BASE_URL || 'no definida'}`);
-    console.log(`   - REDIS_HOST: ${process.env.REDIS_HOST || 'no definida'}`);
-    console.log(`   - NODE_ENV: ${process.env.NODE_ENV || 'no definida'}`);
+    console.log('🚀 AppService iniciado');
+    console.log(`⏰ Timeout configurado: ${this.API_TIMEOUT}ms`);
+    console.log(`🌐 API Base URL: ${process.env.API_BASE_URL || 'https://cloud.urbe.edu/web/v1/core/labComp/rotafolio'}`);
     
+    // Primera actualización al iniciar
+    console.log('📡 Ejecutando primera actualización...');
     await this.update();
+    
+    // Actualizaciones periódicas
     const intervalTime = parseInt(process.env.UPDATE_INTERVAL || '60000');
+    console.log(`⏰ Actualizaciones programadas cada ${intervalTime}ms`);
     setInterval(() => this.update(), intervalTime);
   }
 
   private async update() {
     console.log('=================================');
-    console.log(`🕒 ${new Date().toISOString()} - Actualizando`);
+    console.log(`🕒 ${new Date().toLocaleString()} - Iniciando actualización`);
     
     try {
       const baseUrl = process.env.API_BASE_URL || 'https://cloud.urbe.edu/web/v1/core/labComp/rotafolio';
       
-      // Versión con headers para simular un navegador real
-      const headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-        'Accept-Language': 'es-ES,es;q=0.9',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      };
+      console.log(`📡 Solicitando BLOQUE F (idBloque=6)...`);
+      const startF = Date.now();
+      const fResponse = await axios.get(`${baseUrl}?idBloque=6`, { 
+        headers: { 
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'application/json'
+        },
+        timeout: this.API_TIMEOUT 
+      });
       
-      console.log(`📡 Fetching F desde: ${baseUrl}?idBloque=6`);
-      console.log(`📋 Headers: ${JSON.stringify(headers)}`);
+      console.log(`📡 Solicitando BLOQUE G (idBloque=7)...`);
+      const startG = Date.now();
+      const gResponse = await axios.get(`${baseUrl}?idBloque=7`, { 
+        headers: { 
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'application/json'
+        },
+        timeout: this.API_TIMEOUT 
+      });
       
-      const fResponse = await fetch(`${baseUrl}?idBloque=6`, { headers });
-      console.log(`📊 Status F: ${fResponse.status} ${fResponse.statusText}`);
-      
-      console.log(`📡 Fetching G desde: ${baseUrl}?idBloque=7`);
-      const gResponse = await fetch(`${baseUrl}?idBloque=7`, { headers });
-      console.log(`📊 Status G: ${gResponse.status} ${gResponse.statusText}`);
 
-      // Leer el texto de la respuesta para debug
-      const fText = await fResponse.text();
-      const gText = await gResponse.text();
-      
-      console.log(`📝 Respuesta F (primeros 200 chars): ${fText.substring(0, 200)}`);
-      console.log(`📝 Respuesta G (primeros 200 chars): ${gText.substring(0, 200)}`);
-
-      // Intentar parsear JSON
-      let f, g;
-      try {
-        f = JSON.parse(fText);
-        g = JSON.parse(gText);
-      } catch (e) {
-        console.error('❌ Error parseando JSON:', e.message);
-        return;
-      }
-
-      console.log(`✅ Datos OK - F: ${f?.length || 0} items, G: ${g?.length || 0} items`);
+      const f = Array.isArray(fResponse.data) ? fResponse.data : [];
+      const g = Array.isArray(gResponse.data) ? gResponse.data : [];
 
       const ttl = parseInt(process.env.CACHE_TTL || '60000');
       
+      // Guardar en Redis
       await Promise.allSettled([
         this.redis.set('F', f, ttl),
         this.redis.set('G', g, ttl)
       ]);
       
-      this.fallback.set('F', f).set('G', g);
-      console.log('✅ Guardado en Redis y fallback');
+      // Guardar en fallback local
+      this.fallback.set('F', f);
+      this.fallback.set('G', g);
+      
+      console.log(`✅ Datos guardados - F: ${f.length} items, G: ${g.length} items`);
       
     } catch (error) {
-      console.error('❌ Error:', error.message);
+      console.error('❌ Error en actualización:', error.message);
+      if (error.code === 'ECONNABORTED') {
+        console.error('   ⏰ Tiempo de espera agotado. La API tardó más de 30 segundos en responder.');
+      }
+      console.log('   ℹ️ Usando datos del fallback local');
+      
+      // Mostrar tamaño del fallback
+      console.log(`   📦 Fallback actual: F=${this.fallback.get('F')?.length || 0} items, G=${this.fallback.get('G')?.length || 0} items`);
     }
     console.log('=================================');
   }
 
   private async get(key: string, fallbackKey: string) {
+    console.log(`🔍 GET /schedule/${key} - ${new Date().toLocaleString()}`);
     try {
       const cached = await this.redis.get(key);
-      if (cached) return cached;
-      return this.fallback.get(fallbackKey) || [];
-    } catch {
-      return this.fallback.get(fallbackKey) || [];
+      if (cached) {
+        
+        return cached;
+      }
+      const fallback = this.fallback.get(fallbackKey) || [];
+      console.log(`⚠️ Usando fallback local: ${fallback.length} items`);
+      return fallback;
+    } catch (error) {
+      console.error(`❌ Error en Redis:`, error.message);
+      const fallback = this.fallback.get(fallbackKey) || [];
+      return fallback;
     }
   }
 
