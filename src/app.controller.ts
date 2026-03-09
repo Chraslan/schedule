@@ -27,39 +27,19 @@ export class AppController {
 
   @Get('F')
   async getscheduleF(){
-    const scheduleF = await this.appService.getscheduleF() as ScheduleData;
+    const scheduleF = await this.appService.getscheduleF();
     return{
       Bloque: "F",
-      schedule: {
-        identificacion: scheduleF.identificacion,
-        docente: scheduleF.docente,
-        seccion: scheduleF.seccion,
-        materia: scheduleF.materia,
-        aula: scheduleF.aula,
-        turno: scheduleF.turno,
-        estado: scheduleF.estado,
-        horaEntrada: scheduleF.horaEntrada,
-        horaSalida: scheduleF.horaSalida
-      }
+      schedule: scheduleF
     } 
   }
 
   @Get('G')
   async getscheduleG() {
-    const scheduleG = await this.appService.getscheduleG() as ScheduleData;
+    const scheduleG = await this.appService.getscheduleG();
     return {
       Bloque: "G",
-      schedule: {
-        identificacion: scheduleG.identificacion,
-        docente: scheduleG.docente,
-        seccion: scheduleG.seccion,
-        materia: scheduleG.materia,
-        aula: scheduleG.aula,
-        turno: scheduleG.turno,
-        estado: scheduleG.estado,
-        horaEntrada: scheduleG.horaEntrada,
-        horaSalida: scheduleG.horaSalida
-      }
+      schedule: scheduleG
     }
   }
 }
