@@ -6,7 +6,7 @@ import axios from 'axios';
 @Injectable()
 export class AppService implements OnModuleInit {
   private fallback = new Map<string, any[]>();
-  private readonly API_TIMEOUT = 30000; // 30 segundos
+  private readonly API_TIMEOUT = 300000; // 300 segundos (5 minutos)
 
   constructor(@Inject(CACHE_MANAGER) private redis: Cache) {}
 
